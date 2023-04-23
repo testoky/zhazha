@@ -120,11 +120,13 @@ git clone https://$GH_PAT@github.com/$GH_USER/$GH_REPO.git
 
 # 停掉面板才能备份
 supervisorctl stop nezha
-sleep 10
+sleep 5
 
+# github 备份并重启面板
 if [[ \$(supervisorctl status nezha) =~ STOPPED ]]; then
   TIME=\$(date "+%Y-%m-%d-%H:%M:%S")
   tar czvf $GH_REPO/dashboard-\$TIME.tar.gz /dashboard
+  supervisorctl start nezha
   cd $GH_REPO
   find ./ -name '*.gz' | sort | head -n -30 | xargs rm -f
   git config --global user.email $GH_EMAIL
@@ -135,9 +137,6 @@ if [[ \$(supervisorctl status nezha) =~ STOPPED ]]; then
   cd ..
   rm -rf $GH_REPO
 fi
-
-# 重启面板
-supervisorctl start nezha
 EOF
 
   # 生成还原数据脚本
