@@ -9,7 +9,7 @@ printf "nameserver 127.0.0.11\nnameserver 8.8.4.4\nnameserver 223.5.5.5\n" > /et
 
 # 根据参数生成哪吒服务端配置文件
 [ ! -d data ] && mkdir data
-cat > ./data/config.yaml << EOF
+cat > /dashboard/data/config.yaml << EOF
 debug: false
 site:
   brand: Nezha Probe
@@ -109,7 +109,7 @@ EOF
 # 生成备份和恢复脚本
 if [[ -n "$GH_USER" && -n "$GH_EMAIL" && -n "$GH_REPO" && -n "$GH_PAT" ]]; then
   # 生成定时备份数据库脚本，定时任务，删除 30 天前的备份
-  cat > ./backup.sh << EOF
+  cat > /dashboard/backup.sh << EOF
 #!/usr/bin/env bash
 
 [ -n "\$1" ] && WAY=Scheduled || WAY=Manualed
@@ -140,10 +140,16 @@ fi
 EOF
 
   # 生成还原数据脚本
-  cat > ./restore.sh << EOF
+  cat > /dashboard/restore.sh << EOF
 #!/usr/bin/env bash
 
-[[ "\$1" =~ tar\.gz ]] && FILE="\$1"
+if [ "\$1" = a ]; then
+  ONLINE="\$(wget -qO- --header="Authorization: token $GH_PAT" --header='Accept: application/vnd.github.v3.raw' "https://raw.githubusercontent.com/$GH_USER/$GH_REPO/main/README.md" | sed "/^$/d" | head -n 1)"
+  [ "\$ONLINE" = "\$(cat /dbfile)" ] && exit
+  [[ "\$ONLINE" =~ tar\.gz$ && "\$ONLINE" != "\$(cat /dbfile)" ]] && FILE="\$ONLINE" && echo "\$FILE" > /dbfile
+elif [[ "\$1" =~ tar\.gz$ ]]; then
+  FILE="\$1"
+fi
 
 until [[ -n "\$FILE" || "\$i" = 5 ]]; do
   [ -z "\$FILE" ] && read -rp ' Please input the backup file name (*.tar.gz): ' FILE
@@ -166,11 +172,12 @@ if [ -e /tmp/backup.tar.gz ]; then
   supervisorctl start nezha
 fi
 
-[[ \$(supervisorctl status nezha) =~ RUNNING ]] && echo " Done! " || echo " Fail! "
+[[ \$(supervisorctl status nezha) =~ RUNNING ]] && echo -e "\n Done! \n" || echo -e "\n Fail! \n"
 EOF
 
-  # 生成定时任务，每天北京时间 4:00:00 备份一次，并重启 cron 服务
+  # 生成定时任务，每天北京时间 4:00:00 备份一次，并重启 cron 服务; 每分钟自动检测在线备份文件里的内容
   echo "0 4 * * * root bash /dashboard/backup.sh a" >> /etc/crontab
+  echo "* * * * * root bash /dashboard/restore.sh a" >> /etc/crontab
   service cron restart
 fi
 
@@ -194,6 +201,13 @@ autostart=true
 autorestart=true
 stderr_logfile=/var/log/nezha.err.log
 stdout_logfile=/var/log/nezha.out.log
+
+[program:agent]
+command=/dashboard/nezha-agent -s localhost:5555 -p abcdefghijklmnopqr
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/agent.err.log
+stdout_logfile=/var/log/agent.out.log
 
 [program:argo]
 command=cloudflared tunnel --edge-ip-version auto --config /dashboard/argo.yml run
