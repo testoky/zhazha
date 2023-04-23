@@ -5,7 +5,7 @@
 grep -qv '"' <<< $ARGO_JSON && ARGO_JSON=$(sed 's@{@{"@g;s@[,:]@"\0"@g;s@}@"}@g' <<< $ARGO_JSON)  # 没有了"的处理
 [ -n "$GH_REPO" ] && grep -q '/' <<< $GH_REPO && GH_REPO=$(awk -F '/' '{print $NF}' <<< $GH_REPO)  # 填了项目全路径的处理
 
-printf "nameserver 127.0.0.11\nnameserver 8.8.4.4\nnameserver 223.5.5.5\n" > /etc/resolv.conf
+echo -e "nameserver 127.0.0.11\nnameserver 8.8.4.4\nnameserver 223.5.5.5\n" > /etc/resolv.conf
 
 # 根据参数生成哪吒服务端配置文件
 [ ! -d data ] && mkdir data
@@ -112,11 +112,16 @@ if [[ -n "$GH_USER" && -n "$GH_EMAIL" && -n "$GH_REPO" && -n "$GH_PAT" ]]; then
   cat > /dashboard/backup.sh << EOF
 #!/usr/bin/env bash
 
+GH_PAT=$GH_PAT
+GH_USER=$GH_USER
+GH_EMAIL=$GH_EMAIL
+GH_REPO=$GH_REPO
+
 [ -n "\$1" ] && WAY=Scheduled || WAY=Manualed
 
 # 克隆现有备份库
 cd /tmp
-git clone https://$GH_PAT@github.com/$GH_USER/$GH_REPO.git
+git clone https://\$GH_PAT@github.com/\$GH_USER/\$GH_REPO.git
 
 # 停掉面板才能备份
 supervisorctl stop nezha
@@ -125,26 +130,32 @@ sleep 5
 # github 备份并重启面板
 if [[ \$(supervisorctl status nezha) =~ STOPPED ]]; then
   TIME=\$(date "+%Y-%m-%d-%H:%M:%S")
-  tar czvf $GH_REPO/dashboard-\$TIME.tar.gz /dashboard
+  tar czvf \$GH_REPO/dashboard-\$TIME.tar.gz /dashboard
   supervisorctl start nezha
-  cd $GH_REPO
+  cd \$GH_REPO
   find ./ -name '*.gz' | sort | head -n -30 | xargs rm -f
-  git config --global user.email $GH_EMAIL
-  git config --global user.name $GH_USER
+  git config --global user.email \$GH_EMAIL
+  git config --global user.name \$GH_USER
   git add .
   git commit -m "\$WAY at \$TIME ."
   git push
   cd ..
-  rm -rf $GH_REPO
+  rm -rf \$GH_REPO
 fi
+
+[[ \$(supervisorctl status nezha) =~ RUNNING ]] && echo -e "\n Done! \n" || echo -e "\n Fail! \n"
 EOF
 
   # 生成还原数据脚本
   cat > /dashboard/restore.sh << EOF
 #!/usr/bin/env bash
 
+GH_PAT=$GH_PAT
+GH_USER=$GH_USER
+GH_REPO=$GH_REPO
+
 if [ "\$1" = a ]; then
-  ONLINE="\$(wget -qO- --header="Authorization: token $GH_PAT" --header='Accept: application/vnd.github.v3.raw' "https://raw.githubusercontent.com/$GH_USER/$GH_REPO/main/README.md" | sed "/^$/d" | head -n 1)"
+  ONLINE="\$(wget -qO- --header="Authorization: token \$GH_PAT" --header='Accept: application/vnd.github.v3.raw' "https://raw.githubusercontent.com/\$GH_USER/\$GH_REPO/main/README.md" | sed "/^$/d" | head -n 1)"
   [ "\$ONLINE" = "\$(cat /dbfile)" ] && exit
   [[ "\$ONLINE" =~ tar\.gz$ && "\$ONLINE" != "\$(cat /dbfile)" ]] && FILE="\$ONLINE" && echo "\$FILE" > /dbfile
 elif [[ "\$1" =~ tar\.gz$ ]]; then
@@ -162,8 +173,8 @@ else
   echo " The input has failed more than 5 times and the script exits. " && exit 1
 fi
 
-DOWNLOAD_URL=https://raw.githubusercontent.com/$GH_USER/$GH_REPO/main/\$FILE
-wget --header="Authorization: token $GH_PAT" --header='Accept: application/vnd.github.v3.raw' -O /tmp/backup.tar.gz "\$DOWNLOAD_URL"
+DOWNLOAD_URL=https://raw.githubusercontent.com/\$GH_USER/\$GH_REPO/main/\$FILE
+wget --header="Authorization: token \$GH_PAT" --header='Accept: application/vnd.github.v3.raw' -O /tmp/backup.tar.gz "\$DOWNLOAD_URL"
 
 if [ -e /tmp/backup.tar.gz ]; then
   supervisorctl stop nezha
