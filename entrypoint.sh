@@ -87,8 +87,8 @@ http {
   }
 
   server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 8443 ssl http2;
+    listen [::]:8443 ssl http2;
     server_name $DATA_DOMAIN;
 
     ssl_certificate          /dashboard/nezha.pem;
