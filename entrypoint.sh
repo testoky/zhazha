@@ -132,6 +132,8 @@ if [[ \$(supervisorctl status nezha) =~ STOPPED ]]; then
   TIME=\$(date "+%Y-%m-%d-%H:%M:%S")
   tar czvf \$GH_REPO/dashboard-\$TIME.tar.gz /dashboard
   supervisorctl start nezha
+  echo "dashboard-\$TIME.tar.gz" > /dbfile
+  echo "dashboard-\$TIME.tar.gz" > README.md
   cd \$GH_REPO
   find ./ -name '*.gz' | sort | head -n -30 | xargs rm -f
   git config --global user.email \$GH_EMAIL
@@ -157,7 +159,7 @@ GH_REPO=$GH_REPO
 if [ "\$1" = a ]; then
   ONLINE="\$(wget -qO- --header="Authorization: token \$GH_PAT" --header='Accept: application/vnd.github.v3.raw' "https://raw.githubusercontent.com/\$GH_USER/\$GH_REPO/main/README.md" | sed "/^$/d" | head -n 1)"
   [ "\$ONLINE" = "\$(cat /dbfile)" ] && exit
-  [[ "\$ONLINE" =~ tar\.gz$ && "\$ONLINE" != "\$(cat /dbfile)" ]] && FILE="\$ONLINE" && echo "\$FILE" > /dbfile
+  [[ "\$ONLINE" =~ tar\.gz$ && "\$ONLINE" != "\$(cat /dbfile)" ]] && FILE="\$ONLINE" && echo "\$FILE" > /dbfile || exit
 elif [[ "\$1" =~ tar\.gz$ ]]; then
   FILE="\$1"
 fi
