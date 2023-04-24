@@ -26,7 +26,7 @@ httpport: 80
 grpcport: 5555
 grpchost: $DATA_DOMAIN
 proxygrpcport: 443
-tls: true
+tls: false
 enableipchangenotification: false
 enableplainipinnotification: false
 cover: 0
@@ -87,8 +87,8 @@ http {
   }
 
   server {
-    listen 8443 ssl http2;
-    listen [::]:8443 ssl http2;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name $DATA_DOMAIN;
 
     ssl_certificate          /dashboard/nezha.pem;
